@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Khushi • Screenshot Access</title>
+  <style>
+    :root{
+      --bg:#0b0f17; --panel:#121826; --muted:#94a3b8; --text:#e2e8f0;
+      --yes:#22c55e; --no:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      background:linear-gradient(180deg,#0b0f17,#0f172a);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif
+    }
+    .container{max-width:980px;margin:0 auto;padding:24px}
+    header{padding:16px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    h1{margin:8px 0 0;font-size:clamp(22px,3.2vw,32px)}
+    .muted{color:var(--muted)}
+
+    /* Gate card */
+    .gate{
+      margin:28px 0;padding:18px;display:grid;gap:14px;
+      background:linear-gradient(180deg,#121826,#0f172a);
+      border:1px solid rgba(255,255,255,.08);border-radius:14px
+    }
+    .question{font-weight:600;line-height:1.45}
+    .btn-row{
+      position:relative; /* track for the running Yes button */
+      height:44px;       /* track height */
+      display:flex;align-items:center;gap:12px
+    }
+    .btn{
+      appearance:none;border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);color:var(--text);
+      padding:10px 14px;border-radius:10px;cursor:pointer;
+      transition:.15s transform ease,.15s background ease
+    }
+    .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.12)}
+    .btn.yes{background:var(--yes);border-color:transparent;color:#052e12}
+    .btn.no{background:var(--no);border-color:transparent;color:#2a0b0b}
+
+    /* After chase ends: stack vertically with Yes above No */
+    .btn-row.vertical{
+      display:flex;flex-direction:column;align-items:flex-start;height:auto;gap:10px
+    }
+
+    /* Reveal panel */
+    .reveal{
+      display:none;
+      margin:28px 0;padding:18px;
+      background:linear-gradient(180deg,#121826,#0f172a);
+      border:1px solid rgba(255,255,255,.08);border-radius:14px
+    }
+    .shot{width:100%;height:auto;border-radius:10px;display:block}
+    .caption{color:var(--muted);margin-top:8px;font-size:14px}
+
+    /* Accessibility: reduce motion */
+    @media (prefers-reduced-motion: reduce){
+      .btn{transition:none}
+    }
+  </style>
+</head>
+<body>
+  <header class="container">
+    <h1>Khushi’s Page</h1>
+    <p class="muted">Answer the prompt to view the screenshot.</p>
+  </header>
+
+  <!-- YES / NO GATE -->
+  <section class="container gate" id="gate">
+    <!-- 🔴 EXACT WORDS you asked for -->
+    <div class="question" id="theQuestion">
+      hey i have something for you - you wanna see ??  try to press - <b>yes, b!tch</b>
+    </div>
+
+    <div class="btn-row" id="btnRow">
+      <button class="btn yes" id="yesBtn" aria-label="Yes">yes, b!tch</button>
+      <button class="btn no" id="noBtn" aria-label="No">No</button>
+    </div>
+
+    <p class="muted" id="gateMsg">Go on… try pressing “yes, b!tch”.</p>
+  </section>
+
+  <!-- REVEAL (shows only after pressing No) -->
+  <section class="container reveal" id="reveal">
+    <h2>Screenshot</h2>
+    <!-- If you move the image into a folder like asset/, change src to asset/Screenshot2026-02-06212838.jpg -->
+    <img src="Screenshot2026-02-06212838.jpg" alt="Screenshot" class="shot" id="shot" loading="lazy">
+    <p style="margin-top:10px">
+      <a class="btn" href="Screenshot2026-02-06212838.jpg" download>⬇ Download</a>
+      <a class="btn" href="Screenshot2026-02-06212838.jpg" target="_blank" rel="noopener">↗ Open in new tab</a>
+    </p>
+    <div class="caption">If the image doesn’t load, check the exact filename/path in your repo.</div>
+  </section>
+
+  <script>
+    // ====== YES button "run away" behavior ======
+    const btnRow = document.getElementById('btnRow');
+    const yesBtn = document.getElementById('yesBtn');
+    const noBtn  = document.getElementById('noBtn');
+    const gate   = document.getElementById('gate');
+    const reveal = document.getElementById('reveal');
+    const gateMsg = document.getElementById('gateMsg');
+
+    let chaseStarted = false;
+    const RUNS = 4; // right -> left 4 times
+
+    function trackMetrics(){
+      const track = btnRow.getBoundingClientRect();
+      const btn = yesBtn.getBoundingClientRect();
+      const max = Math.max(0, track.width - btn.width);
+      return { max };
+    }
+    function moveTo(x){
+      return new Promise(resolve=>{
+        const done = ()=>{ yesBtn.removeEventListener('transitionend', done); resolve(); };
+        yesBtn.addEventListener('transitionend', done, { once:true });
+        yesBtn.style.left = x + 'px';
+      });
+    }
+    async function startChase(){
+      if (chaseStarted) return;
+      chaseStarted = true;
+
+      // Prepare absolute positioning inside the row
+      yesBtn.style.position = 'absolute';
+      yesBtn.style.top = '0px';
+      yesBtn.style.transition = 'left 0.35s ease';
+
+      const { max } = trackMetrics();
+      // Start at right edge, then go right->left RUNS times,
+      // bouncing back to right between runs (except after last).
+      yesBtn.style.left = max + 'px';
+      for (let i=0; i<RUNS; i++){
+        await moveTo(0);                    // right → left (counts one)
+        if (i < RUNS - 1) await moveTo(max); // bounce back (not after final)
+      }
+
+      // Finish state: stack vertically (Yes above No)
+      btnRow.classList.add('vertical');
+      yesBtn.style.position = 'static';
+      yesBtn.style.left = '';
+      yesBtn.style.top = '';
+      yesBtn.style.transition = '';
+      gateMsg.textContent = 'Alright 😄 Now press “No” to access the screenshot.';
+    }
+
+    // Trigger chase when user tries to press/touch/hover Yes
+    yesBtn.addEventListener('pointerenter', startChase);
+    yesBtn.addEventListener('pointerdown', startChase);
+    yesBtn.addEventListener('click', (e)=>{ e.preventDefault(); }); // never actually confirms Yes
+
+    // NO reveals the image
+    noBtn.addEventListener('click', ()=>{
+      gate.style.display = 'none';
+      reveal.style.display = 'block';
+      reveal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    // Handle window resize during chase (safety)
+    window.addEventListener('resize', ()=>{
+      if (!chaseStarted) return;
+      btnRow.classList.add('vertical');
+      yesBtn.style.position = 'static';
+      yesBtn.style.left = '';
+      yesBtn.style.transition = '';
+    });
+  </script>
+</body>
+</html>
